@@ -173,3 +173,5 @@ poetry.toml
 # Hide dataset due to size
 ./reviews/*
 reviews/dataset.csv
+reviews/positive_reviews.csv
+reviews/negative_reviews.csv
