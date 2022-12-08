@@ -1,6 +1,7 @@
 import string
-import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+from wordcloud import WordCloud
 from nltk.stem.wordnet import WordNetLemmatizer
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
@@ -12,7 +13,8 @@ path = str(__file__)
 path = path.split("steam_review_datamining.py")
 path = path[0].replace('\\', '/')
 
-stop_words = set(stopwords.words('english')) # stop words
+stop_words = set(stopwords.words('english')) # set the stop words
+stop_words.update(['game', 'games', 'gaming', 'play', 'playing', 'played']) # these words appear frequently in both negative and positive reviews, therefore they have little significance
 table = str.maketrans('', '', string.punctuation) # punctuation table
 
 # cleans a series of sentences
@@ -34,25 +36,34 @@ def clean(series):
 def normalize(sentence):
     result = []
     for word, tag in sentence:
-        if tag.startswith('NN'):
+        if tag.startswith('NN'): # Nouns
             pos = 'n'
-        elif tag.startswith('VB'):
+        elif tag.startswith('VB'): # Verbs
             pos = 'v'
         else:
             pos = 'a'
         result.append(WordNetLemmatizer().lemmatize(word, pos))
     return result
 
-# fastest method for flattening a list. Source: https://chrisconlan.com/fastest-way-to-flatten-a-list-in-python/
+# fast method for flattening a list. Source: https://chrisconlan.com/fastest-way-to-flatten-a-list-in-python/
 def flatten_sentence(sentence_list):
     result = []
     for sentence in sentence_list:
         result += sentence
     return result
 
+# plots a word cloud
+def show_cloud(wordCloud):
+    plt.figure(figsize = (8, 8), facecolor = None)
+    plt.imshow(wordCloud)
+    plt.axis("off")
+    plt.tight_layout(pad = 0)
+    plt.show()
+
 if __name__ == "__main__":
     # import the data:
-    steam_reviews = pd.read_csv(path + 'reviews/dataset.csv', nrows=100000)
+    steam_reviews = pd.read_csv(path + 'reviews/dataset.csv')
+    steam_reviews = steam_reviews.sample(frac=0.35) # use a percentage of the data for efficiency
     #steam_reviews = steam_reviews[steam_reviews['review_votes'] > 0] # only consider reviews that were recommended
     steam_reviews = steam_reviews.astype({"review_text": str}) # convert review text to string for tokenization
     steam_reviews = steam_reviews[steam_reviews['review_score'].notnull()] # remove null scores
@@ -71,15 +82,27 @@ if __name__ == "__main__":
     # use pos_tag to determine context of review words.
     taggedPosWords = [pos_tag(sentence) for sentence in posWords]
     taggedNegWords = [pos_tag(sentence) for sentence in negWords]
+
     # lemmatize sentences
     lemmatizedPosWords = [normalize(sentence) for sentence in taggedPosWords]
     lemmatizedNegWords = [normalize(sentence) for sentence in taggedNegWords]
+
     # flatten the sentences into one
     allPosWords = flatten_sentence(lemmatizedPosWords)
     allNegWords = flatten_sentence(lemmatizedNegWords)
 
+    # get frequent words
     posWordFreq = FreqDist(allPosWords)
     negWordFreq = FreqDist(allNegWords)
+    commonPosWords = [t[0] for t in posWordFreq.most_common(30)]
+    commonNegWords = [t[0] for t in negWordFreq.most_common(30)]
+    
+    # get unique words for positive and negative reviews
+    commonPosWords, commonNegWords = list(set(commonPosWords) - set(commonNegWords)), list(set(commonNegWords) - set(commonPosWords))
 
-    print(posWordFreq.most_common(20))
-    print(negWordFreq.most_common(20))
+    # generate a word cloud
+    posWordCloud = WordCloud(width = 800, height = 800, background_color="white").generate(" ".join(commonPosWords))
+    negWordCloud = WordCloud(width = 800, height = 800, background_color="white").generate(" ".join(commonNegWords))
+
+    show_cloud(posWordCloud)
+    show_cloud(negWordCloud)
